@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using SharingPicture.Data.Entities;
 using System;
 using System.Collections.Generic;
@@ -33,6 +33,8 @@ public partial class SharingPictureDbContext : DbContext
     public virtual DbSet<Tag> Tags { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<UserRole> UserRoles { get; set; }
 
     public virtual DbSet<Warning> Warnings { get; set; }
 
@@ -286,23 +288,6 @@ public partial class SharingPictureDbContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("username");
-
-            entity.HasMany(d => d.Roles).WithMany(p => p.Users)
-                .UsingEntity<Dictionary<string, object>>(
-                    "UserRole",
-                    r => r.HasOne<Role>().WithMany()
-                        .HasForeignKey("RoleId")
-                        .HasConstraintName("FK_user_roles_roles"),
-                    l => l.HasOne<User>().WithMany()
-                        .HasForeignKey("UserId")
-                        .HasConstraintName("FK_user_roles_users"),
-                    j =>
-                    {
-                        j.HasKey("UserId", "RoleId").HasName("PK__user_rol__6EDEA1535E733FC6");
-                        j.ToTable("user_roles");
-                        j.IndexerProperty<int>("UserId").HasColumnName("user_id");
-                        j.IndexerProperty<int>("RoleId").HasColumnName("role_id");
-                    });
         });
 
         modelBuilder.Entity<Warning>(entity =>
@@ -321,6 +306,26 @@ public partial class SharingPictureDbContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.Warnings)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("FK_warnings_users");
+        });
+
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.RoleId }).HasName("PK__user_rol__6EDEA1535E733FC6");
+
+            entity.ToTable("user_roles");
+
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.RoleId).HasColumnName("role_id");
+
+            entity.HasOne(d => d.User).WithMany(p => p.UserRoles)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_user_roles_users");
+
+            entity.HasOne(d => d.Role).WithMany(p => p.UserRoles)
+                .HasForeignKey(d => d.RoleId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_user_roles_roles");
         });
 
         OnModelCreatingPartial(modelBuilder);
