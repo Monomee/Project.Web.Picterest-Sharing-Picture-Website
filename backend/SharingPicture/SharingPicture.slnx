@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="SharingPicture.Data/SharingPicture.Data.csproj" />
+  <Project Path="SharingPicture.Services/SharingPicture.Services.csproj" />
+  <Project Path="SharingPicture.WebApi/SharingPicture.WebApi.csproj" />
+</Solution>

@@ -1,0 +1,6 @@
+@SharingPicture.WebApi_HostAddress = http://localhost:5187
+
+GET {{SharingPicture.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
