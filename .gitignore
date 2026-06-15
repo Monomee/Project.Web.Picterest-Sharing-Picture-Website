@@ -83,3 +83,6 @@ nunit-*.xml
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# 5. Cá nhân
+appsettings.json
