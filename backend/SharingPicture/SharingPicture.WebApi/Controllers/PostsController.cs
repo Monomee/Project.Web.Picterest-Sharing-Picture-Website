@@ -46,8 +46,44 @@ public class PostsController : ControllerBase
             caption = p.Caption,
             imageUrl = p.ImageUrl,
             cloudinaryPublicId = p.CloudinaryPublicId,
-            createdAt = p.CreatedAt
+            createdAt = p.CreatedAt,
+            likeCount = p.Likes.Count,
+            isLikedByUser = userId.HasValue && p.Likes.Any(l => l.UserId == userId.Value)
         });
+
+        return Ok(result);
+    }
+
+    [HttpGet("{id}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetPostById(int id)
+    {
+        int? userId = null;
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!string.IsNullOrEmpty(userIdClaim) && int.TryParse(userIdClaim, out var parsedId))
+        {
+            userId = parsedId;
+        }
+
+        var p = await _postService.GetPostByIdAsync(id);
+        if (p == null)
+        {
+            return NotFound(new { message = "Post not found." });
+        }
+
+        var result = new
+        {
+            id = p.Id,
+            userId = p.UserId,
+            username = p.User?.Username ?? "unknown",
+            avatarUrl = p.User?.AvatarUrl,
+            caption = p.Caption,
+            imageUrl = p.ImageUrl,
+            cloudinaryPublicId = p.CloudinaryPublicId,
+            createdAt = p.CreatedAt,
+            likeCount = p.Likes.Count,
+            isLikedByUser = userId.HasValue && p.Likes.Any(l => l.UserId == userId.Value)
+        };
 
         return Ok(result);
     }

@@ -94,3 +94,113 @@ export async function createPost(caption: string, file: File): Promise<PostRespo
 
   return await postResponse.json();
 }
+
+export interface LikeResponse {
+  likeCount: number;
+  isLikedByUser: boolean;
+}
+
+export interface Post {
+  id: number;
+  userId: number;
+  username: string;
+  avatarUrl?: string;
+  caption: string;
+  imageUrl: string;
+  cloudinaryPublicId: string;
+  createdAt: string;
+  likeCount: number;
+  isLikedByUser: boolean;
+}
+
+export interface CommentItem {
+  id: number;
+  userId: number;
+  username: string;
+  avatarUrl?: string;
+  content: string;
+  createdAt: string;
+}
+
+export async function getPost(postId: number): Promise<Post> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}/posts/${postId}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to fetch post.');
+  }
+
+  return response.json();
+}
+
+export async function toggleLike(postId: number): Promise<LikeResponse> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (!token) {
+    throw new Error('Authentication required.');
+  }
+
+  const response = await fetch(`${API_URL}/likes/toggle/${postId}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized.');
+    }
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to toggle like.');
+  }
+
+  return response.json();
+}
+
+export async function getComments(postId: number): Promise<CommentItem[]> {
+  const response = await fetch(`${API_URL}/comments/${postId}`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to fetch comments.');
+  }
+
+  return response.json();
+}
+
+export async function addComment(postId: number, content: string): Promise<CommentItem> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (!token) {
+    throw new Error('Authentication required.');
+  }
+
+  const response = await fetch(`${API_URL}/comments`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ postId, content }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized.');
+    }
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to submit comment.');
+  }
+
+  return response.json();
+}

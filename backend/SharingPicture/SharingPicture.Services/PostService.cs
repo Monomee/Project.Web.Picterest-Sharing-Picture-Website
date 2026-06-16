@@ -39,6 +39,7 @@ public class PostService : IPostService
     {
         IQueryable<Post> query = _context.Posts
             .Include(p => p.User)
+            .Include(p => p.Likes)
             .Where(p => p.IsPrivate != true);
 
         if (currentUserId.HasValue)
@@ -62,5 +63,13 @@ public class PostService : IPostService
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
+    }
+
+    public async Task<Post?> GetPostByIdAsync(int id)
+    {
+        return await _context.Posts
+            .Include(p => p.User)
+            .Include(p => p.Likes)
+            .FirstOrDefaultAsync(p => p.Id == id);
     }
 }

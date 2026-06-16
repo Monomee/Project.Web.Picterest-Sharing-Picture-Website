@@ -63,6 +63,8 @@ builder.Services.AddScoped<IMediaService, MediaService>();
 builder.Services.AddScoped<IPostService, PostService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<ILikeService, LikeService>();
+builder.Services.AddScoped<ICommentService, CommentService>();
 
 var app = builder.Build();
 

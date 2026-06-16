@@ -1,17 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-
-export interface Post {
-  id: number;
-  userId: number;
-  username: string;
-  avatarUrl?: string;
-  caption: string;
-  imageUrl: string;
-  cloudinaryPublicId: string;
-  createdAt: string;
-}
+import { useRouter } from 'next/navigation';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { toggleLike, Post } from '@/services/post.service';
 
 // Generates a deterministic aspect ratio from a post ID to prevent Cumulative Layout Shift (CLS)
 export function getDeterministicAspectRatio(id: number | string): number {
@@ -20,7 +13,6 @@ export function getDeterministicAspectRatio(id: number | string): number {
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
-  // Common aspect ratios in Pinterest masonry feeds
   const ratios = [0.66, 0.75, 0.8, 1.0, 1.2, 1.33];
   const index = Math.abs(hash) % ratios.length;
   return ratios[index];
@@ -31,26 +23,101 @@ interface PinCardProps {
 }
 
 export default function PinCard({ post }: PinCardProps) {
-  const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0); // Optional default mock
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuth();
   const [isAnimating, setIsAnimating] = useState(false);
 
   const aspectRatio = getDeterministicAspectRatio(post.id);
 
-  const handleLikeToggle = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card clicks if navigation is added later
-    setIsAnimating(true);
-    setIsLiked(!isLiked);
-    setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+  // TanStack Mutation for Optimistic Likes Toggle
+  const likeMutation = useMutation({
+    mutationFn: () => toggleLike(post.id),
+    onMutate: async () => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic state
+      await queryClient.cancelQueries({ queryKey: ['posts-feed'] });
 
+      // Snapshot previous query data for all matching feeds (including those with tokens)
+      const previousFeeds = queryClient.getQueriesData({ queryKey: ['posts-feed'] });
+
+      // Optimistically update query data
+      queryClient.setQueriesData({ queryKey: ['posts-feed'] }, (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page: any) =>
+            page.map((p: any) => {
+              if (p.id === post.id) {
+                const nextIsLiked = !p.isLikedByUser;
+                return {
+                  ...p,
+                  isLikedByUser: nextIsLiked,
+                  likeCount: nextIsLiked ? p.likeCount + 1 : p.likeCount - 1,
+                };
+              }
+              return p;
+            })
+          ),
+        };
+      });
+
+      // Also optimistically update single post detail cache if it exists
+      const previousPostDetail = queryClient.getQueryData(['post-detail', post.id]);
+      queryClient.setQueryData(['post-detail', post.id], (old: any) => {
+        if (!old) return old;
+        const nextIsLiked = !old.isLikedByUser;
+        return {
+          ...old,
+          isLikedByUser: nextIsLiked,
+          likeCount: nextIsLiked ? old.likeCount + 1 : old.likeCount - 1,
+        };
+      });
+
+      return { previousFeeds, previousPostDetail };
+    },
+    onError: (err, newLike, context) => {
+      // Rollback feeds
+      if (context?.previousFeeds) {
+        context.previousFeeds.forEach(([queryKey, previousData]) => {
+          queryClient.setQueryData(queryKey, previousData);
+        });
+      }
+      // Rollback post detail
+      if (context?.previousPostDetail) {
+        queryClient.setQueryData(['post-detail', post.id], context.previousPostDetail);
+      }
+    },
+    onSettled: () => {
+      // Sync cache after mutations
+      queryClient.invalidateQueries({ queryKey: ['posts-feed'] });
+      queryClient.invalidateQueries({ queryKey: ['post-detail', post.id] });
+    },
+  });
+
+  const handleLikeToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+    setIsAnimating(true);
+    likeMutation.mutate();
     setTimeout(() => {
       setIsAnimating(false);
     }, 300);
   };
 
+  const handleCardClick = () => {
+    // Append postId search param to trigger the detail modal deep link
+    router.push(`?postId=${post.id}`, { scroll: false });
+  };
+
   return (
-    <div className="group relative w-full overflow-hidden rounded-2xl bg-white/5 border border-white/10 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-1">
-      {/* Container pre-allocated space using aspect-ratio to completely eliminate CLS */}
+    <div 
+      onClick={handleCardClick}
+      className="group relative w-full overflow-hidden rounded-2xl bg-white/5 border border-white/10 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-1 cursor-zoom-in"
+    >
+      {/* Aspect-Ratio pre-allocation to eliminate CLS */}
       <div 
         style={{ aspectRatio: `${aspectRatio}` }} 
         className="relative w-full overflow-hidden bg-slate-900 flex items-center justify-center"
@@ -66,17 +133,22 @@ export default function PinCard({ post }: PinCardProps) {
         {/* Absolute Hover Overlay */}
         <div className="absolute inset-0 bg-black/40 p-4 flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
           
-          {/* Top Row: Actions */}
-          <div className="flex justify-end">
+          {/* Top Row: Like Button */}
+          <div className="flex justify-end items-center gap-2">
+            {post.likeCount > 0 && (
+              <span className="text-xs font-semibold text-white bg-black/30 backdrop-blur-sm px-2 py-1 rounded-md">
+                {post.likeCount} {post.likeCount === 1 ? 'like' : 'likes'}
+              </span>
+            )}
             <button
               onClick={handleLikeToggle}
               className={`flex h-10 w-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md text-white transition-all duration-300 shadow-md ${
-                isLiked ? 'text-red-500 bg-white/20' : 'hover:scale-110'
+                post.isLikedByUser ? 'text-red-500 bg-white/20' : 'hover:scale-110'
               } ${isAnimating ? 'scale-125' : ''}`}
             >
               <svg
                 className={`h-5 w-5 fill-current transition-transform duration-300 ${
-                  isLiked ? 'scale-110' : 'fill-none stroke-current'
+                  post.isLikedByUser ? 'scale-110' : 'fill-none stroke-current'
                 }`}
                 viewBox="0 0 24 24"
                 xmlns="http://www.w3.org/2000/svg"
@@ -100,7 +172,7 @@ export default function PinCard({ post }: PinCardProps) {
             )}
 
             {/* Author details */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
               {post.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
