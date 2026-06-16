@@ -1,6 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using SharingPicture.Data.Context;
 using SharingPicture.Data.Entities;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace SharingPicture.Services;
@@ -30,5 +33,34 @@ public class PostService : IPostService
         _context.Posts.Add(post);
         await _context.SaveChangesAsync();
         return post;
+    }
+
+    public async Task<List<Post>> GetFeedPostsAsync(int? currentUserId, int page, int pageSize)
+    {
+        IQueryable<Post> query = _context.Posts
+            .Include(p => p.User)
+            .Where(p => p.IsPrivate != true);
+
+        if (currentUserId.HasValue)
+        {
+            // Personalized Feed: Get followings of the user
+            var followedUserIds = _context.Follows
+                .Where(f => f.FollowerId == currentUserId.Value)
+                .Select(f => f.FollowedId);
+
+            // Prioritize followed users' posts (true evaluates to 1, false to 0, so ordering descending places followed users first)
+            query = query.OrderByDescending(p => followedUserIds.Contains(p.UserId))
+                         .ThenByDescending(p => p.CreatedAt);
+        }
+        else
+        {
+            // Guest Feed: standard chronological
+            query = query.OrderByDescending(p => p.CreatedAt);
+        }
+
+        return await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
     }
 }

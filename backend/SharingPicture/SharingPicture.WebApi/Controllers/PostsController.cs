@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SharingPicture.Services;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -17,6 +18,38 @@ public class PostsController : ControllerBase
     public PostsController(IPostService postService)
     {
         _postService = postService;
+    }
+
+    [HttpGet("feed")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetFeed([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 10;
+        if (pageSize > 100) pageSize = 100; // Cap to 100 for safety
+
+        int? userId = null;
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!string.IsNullOrEmpty(userIdClaim) && int.TryParse(userIdClaim, out var parsedId))
+        {
+            userId = parsedId;
+        }
+
+        var posts = await _postService.GetFeedPostsAsync(userId, page, pageSize);
+
+        var result = posts.Select(p => new
+        {
+            id = p.Id,
+            userId = p.UserId,
+            username = p.User?.Username ?? "unknown",
+            avatarUrl = p.User?.AvatarUrl,
+            caption = p.Caption,
+            imageUrl = p.ImageUrl,
+            cloudinaryPublicId = p.CloudinaryPublicId,
+            createdAt = p.CreatedAt
+        });
+
+        return Ok(result);
     }
 
     [HttpPost]
