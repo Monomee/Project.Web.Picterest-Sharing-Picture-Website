@@ -125,6 +125,15 @@ export default function HomePage() {
               Create Pin
             </Link>
           )}
+
+          {isAuthenticated && user && (user.roles.includes('admin') || user.roles.includes('moderator')) && (
+            <Link 
+              href="/admin/reports" 
+              className="text-sm font-semibold text-purple-400 hover:text-purple-300 transition"
+            >
+              Admin Dashboard
+            </Link>
+          )}
         </div>
 
         {/* User Account Controls */}

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SharingPicture.Data.Context;
 using SharingPicture.Services;
+using SharingPicture.WebApi.Middleware;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -60,6 +61,8 @@ builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection(
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IMediaService, MediaService>();
 builder.Services.AddScoped<IPostService, PostService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 
 var app = builder.Build();
 
@@ -76,6 +79,7 @@ app.UseHttpsRedirection();
 app.UseCors("CorsPolicy");
 
 app.UseAuthentication();
+app.UseMiddleware<UserStatusValidationMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
