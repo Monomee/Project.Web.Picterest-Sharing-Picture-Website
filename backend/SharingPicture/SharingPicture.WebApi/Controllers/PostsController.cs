@@ -103,7 +103,7 @@ public class PostsController : ControllerBase
             return Unauthorized(new { message = "Invalid or missing user ID claim." });
         }
 
-        var post = await _postService.CreatePostAsync(request.Caption, request.ImageUrl, request.CloudinaryPublicId, userId);
+        var post = await _postService.CreatePostAsync(request.Caption, request.ImageUrl, request.CloudinaryPublicId, userId, request.IsPrivate);
 
         return Ok(new
         {
@@ -127,4 +127,6 @@ public class CreatePostRequest
 
     [Required(ErrorMessage = "Cloudinary public ID is required.")]
     public string CloudinaryPublicId { get; set; } = null!;
+
+    public bool IsPrivate { get; set; }
 }

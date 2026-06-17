@@ -107,6 +107,25 @@ export default function PinCard({ post }: PinCardProps) {
     }, 300);
   };
 
+  const handleDownload = async (e: React.MouseEvent, imageUrl: string, filename: string) => {
+    e.stopPropagation();
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error('Download failed, opening in tab:', err);
+      window.open(imageUrl, '_blank');
+    }
+  };
+
   const handleCardClick = () => {
     // Append postId search param to trigger the detail modal deep link
     router.push(`?postId=${post.id}`, { scroll: false });
@@ -133,7 +152,7 @@ export default function PinCard({ post }: PinCardProps) {
         {/* Absolute Hover Overlay */}
         <div className="absolute inset-0 bg-black/40 p-4 flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
           
-          {/* Top Row: Like Button */}
+          {/* Top Row: Like & Download Buttons */}
           <div className="flex justify-end items-center gap-2">
             {post.likeCount > 0 && (
               <span className="text-xs font-semibold text-white bg-black/30 backdrop-blur-sm px-2 py-1 rounded-md">
@@ -159,6 +178,15 @@ export default function PinCard({ post }: PinCardProps) {
                   strokeWidth="2"
                   d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
                 />
+              </svg>
+            </button>
+            <button
+              onClick={(e) => handleDownload(e, post.imageUrl, `pin-${post.id}.jpg`)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md text-white transition-all duration-300 shadow-md hover:scale-110"
+              title="Download image"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
             </button>
           </div>

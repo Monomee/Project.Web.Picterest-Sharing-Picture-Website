@@ -17,7 +17,7 @@ public class PostService : IPostService
         _context = context;
     }
 
-    public async Task<Post> CreatePostAsync(string caption, string imageUrl, string cloudinaryPublicId, int userId)
+    public async Task<Post> CreatePostAsync(string caption, string imageUrl, string cloudinaryPublicId, int userId, bool isPrivate)
     {
         var post = new Post
         {
@@ -26,7 +26,7 @@ public class PostService : IPostService
             ImageUrl = imageUrl,
             CloudinaryPublicId = cloudinaryPublicId,
             DeliveryStatus = "pending",
-            IsPrivate = false,
+            IsPrivate = isPrivate,
             CreatedAt = DateTime.UtcNow
         };
 

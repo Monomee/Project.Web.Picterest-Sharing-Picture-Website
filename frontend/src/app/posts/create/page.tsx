@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { createPost } from '@/services/post.service';
+import Navbar from '@/components/pinterest/Navbar';
 
 export default function CreatePostPage() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function CreatePostPage() {
 
   // Form states
   const [caption, setCaption] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -103,7 +105,7 @@ export default function CreatePostPage() {
 
     try {
       // Coordinate direct image upload
-      const result = await createPost(caption, selectedFile);
+      const result = await createPost(caption, selectedFile, isPrivate);
       setSuccessMessage('Pin successfully created!');
       
       // Clear form
@@ -135,13 +137,16 @@ export default function CreatePostPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-slate-950 px-4 py-12">
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col relative overflow-hidden">
       {/* Sleek background gradient glowing blobs */}
-      <div className="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-purple-900/20 blur-[120px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] h-[500px] w-[500px] rounded-full bg-pink-900/15 blur-[120px]" />
+      <div className="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-purple-900/15 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] h-[500px] w-[500px] rounded-full bg-pink-900/10 blur-[120px] pointer-events-none" />
 
-      {/* Main glassmorphism creation container */}
-      <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
+      <Navbar />
+
+      <main className="flex-1 flex items-center justify-center px-4 py-12 z-10">
+        {/* Main glassmorphism creation container */}
+        <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
         
         {/* Header toolbar */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-8">
@@ -303,12 +308,29 @@ export default function CreatePostPage() {
                 />
               </div>
 
-              {/* Board hint or details */}
-              <div className="rounded-lg bg-white/5 border border-white/5 p-4 space-y-1">
-                <h5 className="text-xs font-semibold text-gray-300">Publish Setting</h5>
-                <p className="text-xs text-gray-500">
-                  This pin will be published publicly onto the discovery feed.
-                </p>
+              {/* Private Pin Toggle */}
+              <div className="rounded-lg bg-white/5 border border-white/10 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="text-xs font-semibold text-gray-300">Private Pin</h5>
+                    <p className="text-xxs text-gray-500">
+                      When enabled, this pin will be hidden from the explore feed.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPrivate(!isPrivate)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      isPrivate ? 'bg-purple-600' : 'bg-white/10'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        isPrivate ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
 
             </div>
@@ -322,6 +344,7 @@ export default function CreatePostPage() {
         </div>
 
       </div>
+      </main>
     </div>
   );
 }

@@ -24,7 +24,7 @@ export interface PostResponse {
  * 2. Upload file directly to Cloudinary.
  * 3. Send image URL and public ID back to the backend to insert SQL Server metadata record.
  */
-export async function createPost(caption: string, file: File): Promise<PostResponse> {
+export async function createPost(caption: string, file: File, isPrivate: boolean): Promise<PostResponse> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   if (!token) {
     throw new Error('Authentication required. Please log in.');
@@ -81,6 +81,7 @@ export async function createPost(caption: string, file: File): Promise<PostRespo
       caption,
       imageUrl: uploadData.secure_url,
       cloudinaryPublicId: uploadData.public_id,
+      isPrivate,
     }),
   });
 
