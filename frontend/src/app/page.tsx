@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useInView } from 'react-intersection-observer';
 import { useAuth } from '@/hooks/useAuth';
 import MasonryGrid from '@/components/pinterest/MasonryGrid';
-import { Post } from '@/components/pinterest/PinCard';
+import { Post } from '@/services/post.service';
+import PinDetailModal from '@/components/pinterest/PinDetailModal';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7287/api';
 
@@ -237,6 +238,9 @@ export default function HomePage() {
         )}
 
       </main>
+      <Suspense fallback={null}>
+        <PinDetailModal />
+      </Suspense>
     </div>
   );
 }

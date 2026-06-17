@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import PinCard, { Post } from './PinCard';
+import PinCard from './PinCard';
+import { Post } from '@/services/post.service';
 
 interface MasonryGridProps {
   items: Post[];
