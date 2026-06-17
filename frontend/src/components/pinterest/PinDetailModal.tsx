@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { getPost, getComments, addComment, toggleLike, Post, CommentItem } from '@/services/post.service';
+import ReportPostModal from '@/components/pinterest/ReportPostModal';
 
 export default function PinDetailModal() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function PinDetailModal() {
 
   const [commentText, setCommentText] = useState('');
   const [isLikeAnimating, setIsLikeAnimating] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch post details
@@ -133,6 +135,7 @@ export default function PinDetailModal() {
   }, [comments]);
 
   const handleClose = () => {
+    setIsReportOpen(false);
     // Clear postId from URL parameters by pushing back without the postId parameter
     router.push('/', { scroll: false });
   };
@@ -352,6 +355,22 @@ export default function PinDetailModal() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
                     </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isAuthenticated) {
+                          router.push('/login');
+                          return;
+                        }
+                        setIsReportOpen(true);
+                      }}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10 hover:bg-red-500/15 hover:text-red-400 text-white transition-all duration-300 hover:scale-102"
+                      title="Report post"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21v11h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
 
@@ -460,6 +479,14 @@ export default function PinDetailModal() {
         </div>
 
       </div>
+
+      {isReportOpen && (
+        <ReportPostModal
+          isOpen={isReportOpen}
+          onClose={() => setIsReportOpen(false)}
+          postId={postId!}
+        />
+      )}
     </div>
   );
 }

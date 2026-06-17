@@ -59,7 +59,7 @@ public class PostService : IPostService
         IQueryable<Post> query = _context.Posts
             .Include(p => p.User)
             .Include(p => p.Likes)
-            .Where(p => p.IsPrivate != true);
+            .Where(p => p.IsPrivate != true && p.DeliveryStatus != "hidden");
 
         if (!string.IsNullOrEmpty(search))
         {

@@ -340,3 +340,29 @@ export async function updateProfile(displayName: string, avatarUrl?: string): Pr
 
   return response.json();
 }
+
+export async function reportPost(postId: number, reason: string): Promise<{ message: string; reportId: number }> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (!token) {
+    throw new Error('Authentication required.');
+  }
+
+  const response = await fetch(`${API_URL}/reports`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ postId, reason }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized.');
+    }
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to submit report.');
+  }
+
+  return response.json();
+}
