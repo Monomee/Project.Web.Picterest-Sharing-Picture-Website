@@ -137,6 +137,10 @@ export default function PinDetailModal() {
     router.push('/', { scroll: false });
   };
 
+  const handleTagClick = (tag: string) => {
+    router.push(`/?search=${encodeURIComponent(tag)}`, { scroll: false });
+  };
+
   const handleLikeToggle = () => {
     if (!isAuthenticated) {
       router.push('/login');
@@ -288,6 +292,21 @@ export default function PinDetailModal() {
                     <p className="text-gray-400 italic">No description provided.</p>
                   )}
                 </div>
+
+                {/* Clickable Tag Badges */}
+                {post.tags && post.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pb-4">
+                    {post.tags.map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => handleTagClick(tag)}
+                        className="text-xxs font-semibold px-2.5 py-1 rounded-full bg-white/5 hover:bg-purple-600/20 border border-white/10 hover:border-purple-500/30 text-gray-300 hover:text-purple-300 transition duration-200"
+                      >
+                        #{tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Social Counter & Like/Download Actions */}
                 <div className="flex items-center justify-between py-3 px-4 rounded-2xl bg-white/5 border border-white/5 mb-2">

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { createPost } from '@/services/post.service';
@@ -13,6 +13,7 @@ export default function CreatePostPage() {
   // Form states
   const [caption, setCaption] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
+  const [tagsInput, setTagsInput] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -103,13 +104,20 @@ export default function CreatePostPage() {
 
     setIsSubmitting(true);
 
+    // Parse tags to list
+    const parsedTags = tagsInput
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
     try {
       // Coordinate direct image upload
-      const result = await createPost(caption, selectedFile, isPrivate);
+      const result = await createPost(caption, selectedFile, isPrivate, parsedTags);
       setSuccessMessage('Pin successfully created!');
       
       // Clear form
       setCaption('');
+      setTagsInput('');
       setSelectedFile(null);
       setPreviewUrl(null);
 
@@ -142,7 +150,9 @@ export default function CreatePostPage() {
       <div className="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-purple-900/15 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] h-[500px] w-[500px] rounded-full bg-pink-900/10 blur-[120px] pointer-events-none" />
 
-      <Navbar />
+      <Suspense fallback={<div className="h-[73px] bg-slate-950/80 border-b border-white/10" />}>
+        <Navbar />
+      </Suspense>
 
       <main className="flex-1 flex items-center justify-center px-4 py-12 z-10">
         {/* Main glassmorphism creation container */}
@@ -305,6 +315,20 @@ export default function CreatePostPage() {
                   onChange={(e) => setCaption(e.target.value)}
                   rows={6}
                   className="w-full rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50 hover:border-white/20 resize-none"
+                />
+              </div>
+
+              {/* Tags Input */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Tags (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. nature, photography, landscape"
+                  value={tagsInput}
+                  onChange={(e) => setTagsInput(e.target.value)}
+                  className="w-full rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50 hover:border-white/20"
                 />
               </div>
 

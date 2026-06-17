@@ -17,7 +17,7 @@ public class PostService : IPostService
         _context = context;
     }
 
-    public async Task<Post> CreatePostAsync(string caption, string imageUrl, string cloudinaryPublicId, int userId, bool isPrivate)
+    public async Task<Post> CreatePostAsync(string caption, string imageUrl, string cloudinaryPublicId, int userId, bool isPrivate, List<string>? tags)
     {
         var post = new Post
         {
@@ -30,17 +30,43 @@ public class PostService : IPostService
             CreatedAt = DateTime.UtcNow
         };
 
+        if (tags != null && tags.Count > 0)
+        {
+            var tagsList = new List<Tag>();
+            foreach (var tagName in tags)
+            {
+                var cleanName = tagName.Trim().ToLower();
+                if (string.IsNullOrEmpty(cleanName)) continue;
+
+                var tag = await _context.Tags.FirstOrDefaultAsync(t => t.TagName == cleanName);
+                if (tag == null)
+                {
+                    tag = new Tag { TagName = cleanName };
+                    _context.Tags.Add(tag);
+                }
+                tagsList.Add(tag);
+            }
+            post.Tags = tagsList;
+        }
+
         _context.Posts.Add(post);
         await _context.SaveChangesAsync();
         return post;
     }
 
-    public async Task<List<Post>> GetFeedPostsAsync(int? currentUserId, int page, int pageSize)
+    public async Task<List<Post>> GetFeedPostsAsync(int? currentUserId, int page, int pageSize, string? search)
     {
         IQueryable<Post> query = _context.Posts
             .Include(p => p.User)
             .Include(p => p.Likes)
             .Where(p => p.IsPrivate != true);
+
+        if (!string.IsNullOrEmpty(search))
+        {
+            var cleanSearch = search.Trim().ToLower();
+            query = query.Where(p => (p.Caption != null && p.Caption.Contains(cleanSearch)) 
+                                     || p.Tags.Any(t => t.TagName == cleanSearch));
+        }
 
         if (currentUserId.HasValue)
         {
@@ -70,6 +96,7 @@ public class PostService : IPostService
         return await _context.Posts
             .Include(p => p.User)
             .Include(p => p.Likes)
+            .Include(p => p.Tags)
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 }

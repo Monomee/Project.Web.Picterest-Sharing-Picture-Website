@@ -7,6 +7,7 @@ import { useInView } from 'react-intersection-observer';
 import { useAuth } from '@/hooks/useAuth';
 import MasonryGrid from '@/components/pinterest/MasonryGrid';
 import { Post } from '@/services/post.service';
+import { useSearchParams } from 'next/navigation';
 import PinDetailModal from '@/components/pinterest/PinDetailModal';
 import Navbar from '@/components/pinterest/Navbar';
 
@@ -35,15 +36,18 @@ const SkeletonGrid = () => {
   );
 };
 
-export default function HomePage() {
+function HomeFeedContent() {
   const { token, user, isAuthenticated } = useAuth();
+  const searchParams = useSearchParams();
+  const search = searchParams.get('search') || '';
   const fetchFeed = async ({ pageParam = 1 }): Promise<Post[]> => {
     const headers: HeadersInit = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_URL}/posts/feed?page=${pageParam}&pageSize=10`, {
+    const searchVal = search ? `&search=${encodeURIComponent(search)}` : '';
+    const response = await fetch(`${API_URL}/posts/feed?page=${pageParam}&pageSize=10${searchVal}`, {
       method: 'GET',
       headers,
     });
@@ -64,7 +68,7 @@ export default function HomePage() {
     isError,
     error,
   } = useInfiniteQuery({
-    queryKey: ['posts-feed', token],
+    queryKey: ['posts-feed', token, search],
     queryFn: fetchFeed,
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => {
@@ -99,7 +103,9 @@ export default function HomePage() {
       <div className="absolute bottom-[-10%] right-[-10%] h-[600px] w-[600px] rounded-full bg-pink-900/10 blur-[130px]" />
 
       {/* Sticky Global Navigation Bar */}
-      <Navbar />
+      <Suspense fallback={<div className="h-[73px] bg-slate-950/80 border-b border-white/10" />}>
+        <Navbar />
+      </Suspense>
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8">
@@ -180,5 +186,20 @@ export default function HomePage() {
         <PinDetailModal />
       </Suspense>
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <svg className="animate-spin h-10 w-10 text-purple-500" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+      </div>
+    }>
+      <HomeFeedContent />
+    </Suspense>
   );
 }
