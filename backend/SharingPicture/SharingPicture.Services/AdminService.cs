@@ -114,6 +114,11 @@ public class AdminService : IAdminService
         }
         else if (action == "DISMISS")
         {
+            if (report.Post != null)
+            {
+                report.Post.DeliveryStatus = "pending";
+            }
+
             // Central Audit Log
             await _auditLogService.LogActionAsync(
                 "DISMISS_REPORT",

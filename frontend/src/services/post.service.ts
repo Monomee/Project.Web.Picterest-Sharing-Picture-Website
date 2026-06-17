@@ -24,7 +24,7 @@ export interface PostResponse {
  * 2. Upload file directly to Cloudinary.
  * 3. Send image URL and public ID back to the backend to insert SQL Server metadata record.
  */
-export async function createPost(caption: string, file: File): Promise<PostResponse> {
+export async function createPost(caption: string, file: File, isPrivate: boolean, tags?: string[]): Promise<PostResponse> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   if (!token) {
     throw new Error('Authentication required. Please log in.');
@@ -81,6 +81,8 @@ export async function createPost(caption: string, file: File): Promise<PostRespo
       caption,
       imageUrl: uploadData.secure_url,
       cloudinaryPublicId: uploadData.public_id,
+      isPrivate,
+      tags,
     }),
   });
 
@@ -111,6 +113,8 @@ export interface Post {
   createdAt: string;
   likeCount: number;
   isLikedByUser: boolean;
+  tags?: string[];
+  isPrivate?: boolean;
 }
 
 export interface CommentItem {
@@ -200,6 +204,164 @@ export async function addComment(postId: number, content: string): Promise<Comme
     }
     const errData = await response.json().catch(() => ({}));
     throw new Error(errData.message || 'Failed to submit comment.');
+  }
+
+  return response.json();
+}
+
+export interface UserProfileDto {
+  id: number;
+  username: string;
+  avatarUrl?: string;
+  createdAt?: string;
+  followersCount: number;
+  followingCount: number;
+  isFollowing: boolean;
+}
+
+export async function getProfile(userId: number): Promise<UserProfileDto> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}/profile/${userId}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to fetch user profile.');
+  }
+
+  return response.json();
+}
+
+export async function getProfilePosts(userId: number, type: 'created' | 'liked'): Promise<Post[]> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}/profile/${userId}/posts?type=${type}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to fetch profile posts.');
+  }
+
+  return response.json();
+}
+
+export async function toggleFollow(userId: number): Promise<{ isFollowing: boolean }> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (!token) {
+    throw new Error('Authentication required.');
+  }
+
+  const response = await fetch(`${API_URL}/profile/${userId}/follow`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized.');
+    }
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to toggle follow status.');
+  }
+
+  return response.json();
+}
+
+export interface FollowUserDto {
+  id: number;
+  username: string;
+  avatarUrl?: string;
+}
+
+export async function getFollowers(userId: number): Promise<FollowUserDto[]> {
+  const response = await fetch(`${API_URL}/profile/${userId}/followers`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to fetch followers.');
+  }
+
+  return response.json();
+}
+
+export async function getFollowing(userId: number): Promise<FollowUserDto[]> {
+  const response = await fetch(`${API_URL}/profile/${userId}/following`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to fetch following users.');
+  }
+
+  return response.json();
+}
+
+export async function updateProfile(displayName: string, avatarUrl?: string): Promise<{ message: string; username: string; avatarUrl?: string }> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (!token) {
+    throw new Error('Authentication required.');
+  }
+
+  const response = await fetch(`${API_URL}/profile/update`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ displayName, avatarUrl }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized.');
+    }
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to update profile.');
+  }
+
+  return response.json();
+}
+
+export async function reportPost(postId: number, reason: string): Promise<{ message: string; reportId: number }> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (!token) {
+    throw new Error('Authentication required.');
+  }
+
+  const response = await fetch(`${API_URL}/reports`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ postId, reason }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized.');
+    }
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to submit report.');
   }
 
   return response.json();

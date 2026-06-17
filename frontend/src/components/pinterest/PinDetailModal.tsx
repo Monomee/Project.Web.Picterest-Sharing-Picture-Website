@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { getPost, getComments, addComment, toggleLike, Post, CommentItem } from '@/services/post.service';
+import ReportPostModal from '@/components/pinterest/ReportPostModal';
 
 export default function PinDetailModal() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function PinDetailModal() {
 
   const [commentText, setCommentText] = useState('');
   const [isLikeAnimating, setIsLikeAnimating] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch post details
@@ -133,8 +135,13 @@ export default function PinDetailModal() {
   }, [comments]);
 
   const handleClose = () => {
+    setIsReportOpen(false);
     // Clear postId from URL parameters by pushing back without the postId parameter
     router.push('/', { scroll: false });
+  };
+
+  const handleTagClick = (tag: string) => {
+    router.push(`/?search=${encodeURIComponent(tag)}`, { scroll: false });
   };
 
   const handleLikeToggle = () => {
@@ -147,6 +154,25 @@ export default function PinDetailModal() {
     setTimeout(() => {
       setIsLikeAnimating(false);
     }, 300);
+  };
+
+  const handleDownload = async (e: React.MouseEvent, imageUrl: string, filename: string) => {
+    e.stopPropagation();
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error('Download failed, opening in tab:', err);
+      window.open(imageUrl, '_blank');
+    }
   };
 
   const handleCommentSubmit = (e: React.FormEvent) => {
@@ -235,7 +261,13 @@ export default function PinDetailModal() {
               <>
                 {/* Author Header */}
                 <div className="flex items-center justify-between pb-4 border-b border-white/5">
-                  <div className="flex items-center gap-3">
+                  <div 
+                    className="flex items-center gap-3 hover:opacity-80 transition cursor-pointer"
+                    onClick={() => {
+                      handleClose();
+                      router.push(`/profile/${post.userId}`);
+                    }}
+                  >
                     {post.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -270,34 +302,76 @@ export default function PinDetailModal() {
                   )}
                 </div>
 
-                {/* Social Counter & Like Actions */}
+                {/* Clickable Tag Badges */}
+                {post.tags && post.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pb-4">
+                    {post.tags.map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => handleTagClick(tag)}
+                        className="text-xxs font-semibold px-2.5 py-1 rounded-full bg-white/5 hover:bg-purple-600/20 border border-white/10 hover:border-purple-500/30 text-gray-300 hover:text-purple-300 transition duration-200"
+                      >
+                        #{tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Social Counter & Like/Download Actions */}
                 <div className="flex items-center justify-between py-3 px-4 rounded-2xl bg-white/5 border border-white/5 mb-2">
                   <div className="flex items-center gap-2 text-sm text-gray-300 font-semibold">
                     <span>{post.likeCount} {post.likeCount === 1 ? 'like' : 'likes'}</span>
                   </div>
-                  <button
-                    onClick={handleLikeToggle}
-                    disabled={likeMutation.isPending}
-                    className={`flex h-10 px-4 items-center justify-center gap-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white transition-all duration-300 ${
-                      post.isLikedByUser ? 'text-red-500 border-red-500/30 bg-red-500/10' : 'hover:scale-102'
-                    } ${isLikeAnimating ? 'scale-110' : ''}`}
-                  >
-                    <svg
-                      className={`h-5 w-5 fill-current transition-transform duration-300 ${
-                        post.isLikedByUser ? 'scale-105' : 'fill-none stroke-current'
-                      }`}
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleLikeToggle}
+                      disabled={likeMutation.isPending}
+                      className={`flex h-10 px-4 items-center justify-center gap-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white transition-all duration-300 ${
+                        post.isLikedByUser ? 'text-red-500 border-red-500/30 bg-red-500/10' : 'hover:scale-102'
+                      } ${isLikeAnimating ? 'scale-110' : ''}`}
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                      />
-                    </svg>
-                    <span className="text-xs font-bold">{post.isLikedByUser ? 'Liked' : 'Like'}</span>
-                  </button>
+                      <svg
+                        className={`h-5 w-5 fill-current transition-transform duration-300 ${
+                          post.isLikedByUser ? 'scale-105' : 'fill-none stroke-current'
+                        }`}
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                        />
+                      </svg>
+                      <span className="text-xs font-bold">{post.isLikedByUser ? 'Liked' : 'Like'}</span>
+                    </button>
+                    <button
+                      onClick={(e) => handleDownload(e, post.imageUrl, `pin-${post.id}.jpg`)}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white transition-all duration-300 hover:scale-102"
+                      title="Download image"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isAuthenticated) {
+                          router.push('/login');
+                          return;
+                        }
+                        setIsReportOpen(true);
+                      }}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10 hover:bg-red-500/15 hover:text-red-400 text-white transition-all duration-300 hover:scale-102"
+                      title="Report post"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21v11h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Comments Section */}
@@ -405,6 +479,14 @@ export default function PinDetailModal() {
         </div>
 
       </div>
+
+      {isReportOpen && (
+        <ReportPostModal
+          isOpen={isReportOpen}
+          onClose={() => setIsReportOpen(false)}
+          postId={postId!}
+        />
+      )}
     </div>
   );
 }

@@ -22,7 +22,7 @@ public class PostsController : ControllerBase
 
     [HttpGet("feed")]
     [AllowAnonymous]
-    public async Task<IActionResult> GetFeed([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    public async Task<IActionResult> GetFeed([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 10;
@@ -35,7 +35,7 @@ public class PostsController : ControllerBase
             userId = parsedId;
         }
 
-        var posts = await _postService.GetFeedPostsAsync(userId, page, pageSize);
+        var posts = await _postService.GetFeedPostsAsync(userId, page, pageSize, search);
 
         var result = posts.Select(p => new
         {
@@ -82,7 +82,8 @@ public class PostsController : ControllerBase
             cloudinaryPublicId = p.CloudinaryPublicId,
             createdAt = p.CreatedAt,
             likeCount = p.Likes.Count,
-            isLikedByUser = userId.HasValue && p.Likes.Any(l => l.UserId == userId.Value)
+            isLikedByUser = userId.HasValue && p.Likes.Any(l => l.UserId == userId.Value),
+            tags = p.Tags.Select(t => t.TagName).ToList()
         };
 
         return Ok(result);
@@ -103,7 +104,7 @@ public class PostsController : ControllerBase
             return Unauthorized(new { message = "Invalid or missing user ID claim." });
         }
 
-        var post = await _postService.CreatePostAsync(request.Caption, request.ImageUrl, request.CloudinaryPublicId, userId);
+        var post = await _postService.CreatePostAsync(request.Caption, request.ImageUrl, request.CloudinaryPublicId, userId, request.IsPrivate, request.Tags);
 
         return Ok(new
         {
@@ -112,7 +113,8 @@ public class PostsController : ControllerBase
             caption = post.Caption,
             imageUrl = post.ImageUrl,
             cloudinaryPublicId = post.CloudinaryPublicId,
-            createdAt = post.CreatedAt
+            createdAt = post.CreatedAt,
+            tags = post.Tags.Select(t => t.TagName).ToList()
         });
     }
 }
@@ -127,4 +129,8 @@ public class CreatePostRequest
 
     [Required(ErrorMessage = "Cloudinary public ID is required.")]
     public string CloudinaryPublicId { get; set; } = null!;
+
+    public bool IsPrivate { get; set; }
+
+    public List<string>? Tags { get; set; }
 }
