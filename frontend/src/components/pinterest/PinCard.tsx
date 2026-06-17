@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { toggleLike, Post } from '@/services/post.service';
@@ -25,6 +25,7 @@ interface PinCardProps {
 
 export default function PinCard({ post }: PinCardProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuth();
   const [isAnimating, setIsAnimating] = useState(false);
@@ -129,8 +130,9 @@ export default function PinCard({ post }: PinCardProps) {
   };
 
   const handleCardClick = () => {
-    // Append postId search param to trigger the detail modal deep link
-    router.push(`?postId=${post.id}`, { scroll: false });
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('postId', post.id.toString());
+    router.push(`?${params.toString()}`, { scroll: false });
   };
 
   return (

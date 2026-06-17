@@ -127,6 +127,18 @@ export default function PinDetailModal() {
     };
   }, [postId]);
 
+  // Background scroll lock when modal is open
+  useEffect(() => {
+    if (postId !== null && !isNaN(postId)) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [postId]);
+
   // Scroll to bottom of comments when new comments are added
   useEffect(() => {
     if (comments) {
@@ -136,8 +148,10 @@ export default function PinDetailModal() {
 
   const handleClose = () => {
     setIsReportOpen(false);
-    // Clear postId from URL parameters by pushing back without the postId parameter
-    router.push('/', { scroll: false });
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('postId');
+    const queryString = params.toString();
+    router.push(queryString ? `?${queryString}` : '/', { scroll: false });
   };
 
   const handleTagClick = (tag: string) => {

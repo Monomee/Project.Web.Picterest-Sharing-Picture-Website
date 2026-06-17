@@ -15,8 +15,8 @@ export default function Navbar() {
 
   // Synchronize search text input with search query changes in URL
   useEffect(() => {
-    setSearchInput(activeSearch);
-  }, [activeSearch]);
+    setSearchInput(searchParams.get('search') || '');
+  }, [searchParams]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
