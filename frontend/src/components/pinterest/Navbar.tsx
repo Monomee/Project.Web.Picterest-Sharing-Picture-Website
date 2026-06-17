@@ -91,10 +91,21 @@ export default function Navbar() {
       <div className="flex items-center gap-4 flex-shrink-0">
         {isAuthenticated && user ? (
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 font-bold text-xs">
-              {user.username.substring(0, 2).toUpperCase()}
-            </div>
-            <span className="hidden sm:inline text-sm text-gray-300 font-medium">{user.username}</span>
+            <Link href={`/profile/${user.id}`} className="flex items-center gap-2 hover:opacity-80 transition">
+              {user.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={user.avatarUrl}
+                  alt={user.username}
+                  className="h-8 w-8 rounded-full object-cover border border-purple-500/30"
+                />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 font-bold text-xs">
+                  {user.username.substring(0, 2).toUpperCase()}
+                </div>
+              )}
+              <span className="hidden sm:inline text-sm text-gray-300 font-medium">{user.username}</span>
+            </Link>
             <button
               onClick={logout}
               className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 text-gray-400 hover:text-white transition"

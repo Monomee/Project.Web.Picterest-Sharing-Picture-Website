@@ -141,6 +141,13 @@ export default function PinCard({ post }: PinCardProps) {
         style={{ aspectRatio: `${aspectRatio}` }} 
         className="relative w-full overflow-hidden bg-slate-900 flex items-center justify-center"
       >
+        {post.isPrivate && (
+          <div className="absolute top-3 left-3 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 backdrop-blur-md text-amber-500 border border-amber-500/20 z-20 shadow-md" title="Private Pin">
+            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+            </svg>
+          </div>
+        )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={post.imageUrl}
@@ -200,7 +207,13 @@ export default function PinCard({ post }: PinCardProps) {
             )}
 
             {/* Author details */}
-            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <div 
+              className="flex items-center gap-2 hover:opacity-85 transition cursor-pointer" 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/profile/${post.userId}`);
+              }}
+            >
               {post.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img

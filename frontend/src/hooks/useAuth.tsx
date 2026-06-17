@@ -16,6 +16,7 @@ export interface AuthUser {
   id: string;
   username: string;
   roles: string[];
+  avatarUrl?: string;
 }
 
 interface AuthContextType {
@@ -25,6 +26,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (token: string) => void;
   logout: () => void;
+  updateUserMetadata: (username: string, avatarUrl: string) => void;
 }
 
 // Client-side helper functions for cookie management
@@ -92,16 +94,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const rawRole = decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || decoded.role || [];
         const roles = Array.isArray(rawRole) ? rawRole : [rawRole].filter(Boolean);
 
-        setUser({
+        const defaultUser: AuthUser = {
           id: decoded.userId || decoded.nameid || '',
           username: decoded.username || decoded.unique_name || '',
           roles: roles
-        });
+        };
+
+        // Try to load cached user metadata from localStorage or Cookie
+        const storedUser = localStorage.getItem('user') || getCookie('user');
+        if (storedUser) {
+          try {
+            const parsed = JSON.parse(storedUser);
+            if (parsed.id === defaultUser.id) {
+              defaultUser.username = parsed.username || defaultUser.username;
+              defaultUser.avatarUrl = parsed.avatarUrl || defaultUser.avatarUrl;
+            }
+          } catch (e) {
+            console.error('Failed to parse cached user metadata', e);
+          }
+        }
+
+        setUser(defaultUser);
         setToken(savedToken);
       } else {
         // Clear corrupt token
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         eraseCookie('token');
+        eraseCookie('user');
       }
     }
     setIsLoading(false);
@@ -123,6 +143,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(newToken);
       localStorage.setItem('token', newToken);
       setCookie('token', newToken, 7);
+
+      // Save user state
+      localStorage.setItem('user', JSON.stringify(authUser));
+      setCookie('user', JSON.stringify(authUser), 7);
     }
   };
 
@@ -130,13 +154,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setToken(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     eraseCookie('token');
+    eraseCookie('user');
+  };
+
+  const updateUserMetadata = (username: string, avatarUrl: string) => {
+    if (!user) return;
+    const updatedUser = { ...user, username, avatarUrl };
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    setCookie('user', JSON.stringify(updatedUser), 7);
   };
 
   const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ token, user, isAuthenticated, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ token, user, isAuthenticated, isLoading, login, logout, updateUserMetadata }}>
       {children}
     </AuthContext.Provider>
   );

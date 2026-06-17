@@ -258,7 +258,13 @@ export default function PinDetailModal() {
               <>
                 {/* Author Header */}
                 <div className="flex items-center justify-between pb-4 border-b border-white/5">
-                  <div className="flex items-center gap-3">
+                  <div 
+                    className="flex items-center gap-3 hover:opacity-80 transition cursor-pointer"
+                    onClick={() => {
+                      handleClose();
+                      router.push(`/profile/${post.userId}`);
+                    }}
+                  >
                     {post.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
