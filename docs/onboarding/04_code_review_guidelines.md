@@ -126,7 +126,8 @@ Our frontend is a fast, responsive Next.js application styled with vanilla Tailw
 *   **Aspect Ratio Binding**: Always define aspect ratio placeholders or render programmatic skeleton blocks when images are loading. Images must be contained inside components that occupy a fixed, pre-allocated height based on the picture aspect ratio.
 
 ### React Portal Enforcement for Viewport Breakouts
-*   Any global interaction overlay modal instantiated inside deeply nested components (such as a masonry card with active transforms or overflow clips) must utilize React Portal (`createPortal` targeting `document.body`). This guarantees the modal renders outside parent stacking contexts, completely preventing layout truncation and layout trapping bugs.
+*   [ ] **React Portal for Modal Overlays**: Any global interaction overlay modal instantiated inside deeply nested components (such as a Masonry Grid Pin Card with active scaling animations, transitions, or parent `overflow: hidden` contexts) must utilize React Portal (`createPortal` from `react-dom` targeting `document.body`).
+*   **Prevent Trapping & Clipping**: Rendering outside the parent container guarantees that the modal is appended directly under the HTML body element, completely preventing layout truncation, container clipping, or stacking context trapping anomalies caused by parent CSS transforms.
 
 ---
 
@@ -147,27 +148,17 @@ Maintaining the integrity of user data and backend security is paramount. Pay cl
     var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     ```
 
-### Automated Storage Leaks Check
-*   When deleting posts, you must clean up both the database reference and the physical cloud file hosted on Cloudinary.
+### Automated Storage Leaks Check & Eventual Consistency Order
+*   When deleting posts, you must clean up both the SQL database records and the corresponding physical media files stored on Cloudinary.
     > [!IMPORTANT]
-    > Every `DELETE_POST` resolution flow must invoke the Cloudinary API via `MediaService` (using `cloudinary_public_id`) to destroy the asset in the cloud **before** deleting the SQL database row. Leaving orphan files in Cloudinary causes storage leaks and incurs unnecessary costs.
+    > **Strict Eventual Consistency Execution Order**:
+    > You must perform all database deletions and commit the transaction successfully **before** triggering the Cloudinary asset deletion asynchronously. 
+    > 
+    > Attempting to delete cloud assets from Cloudinary *before* the SQL database transaction commits is a **severe distributed systems anti-pattern** and will result in **immediate PR rejection**. If the SQL transaction fails or rolls back, the cloud file will have been permanently lost while the database still references it, leading to corrupted data states.
 
 ### Cascade Integrity Check
-*   Due to SQL Server circular dependency limitations, direct SQL cascade deletes can be disabled on some tables.
-*   **Programmatic Cascades**: Ensure service methods programmatically remove related child tables (comments, likes, reports) *before* attempting to delete the principal row (e.g., User or Post) to prevent relational constraint errors:
-    ```csharp
-    // Sequence order: Comments -> Likes -> Reports -> Post
-    var comments = _context.Comments.Where(c => c.PostId == postId);
-    _context.Comments.RemoveRange(comments);
-    
-    var likes = _context.Likes.Where(l => l.PostId == postId);
-    _context.Likes.RemoveRange(likes);
-    
-    var reports = _context.Reports.Where(r => r.PostId == postId);
-    _context.Reports.RemoveRange(reports);
-    
-    _context.Posts.Remove(post);
-    ```
+*   Due to SQL Server circular dependency limitations, direct SQL cascade deletes are disabled on several tables.
+*   **Programmatic Cascades**: Ensure service methods programmatically remove related child tables (comments, likes, reports) within the active transaction block *before* attempting to delete the principal row (e.g., Post or User) to prevent relational constraint errors.
 
 ---
 
