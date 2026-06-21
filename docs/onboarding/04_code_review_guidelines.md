@@ -125,6 +125,9 @@ Our frontend is a fast, responsive Next.js application styled with vanilla Tailw
 *   To prevent shifting layouts during image loading, we enforce deterministic container layouts.
 *   **Aspect Ratio Binding**: Always define aspect ratio placeholders or render programmatic skeleton blocks when images are loading. Images must be contained inside components that occupy a fixed, pre-allocated height based on the picture aspect ratio.
 
+### React Portal Enforcement for Viewport Breakouts
+*   Any global interaction overlay modal instantiated inside deeply nested components (such as a masonry card with active transforms or overflow clips) must utilize React Portal (`createPortal` targeting `document.body`). This guarantees the modal renders outside parent stacking contexts, completely preventing layout truncation and layout trapping bugs.
+
 ---
 
 ## 4. Security, Identity & Constraints Checklist
