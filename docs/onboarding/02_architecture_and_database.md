@@ -6,17 +6,42 @@ This document covers our decoupled system architecture, core design patterns, cu
 
 ## 1. System Architecture Overview
 
-Picterest utilizes a modern **Decoupled Client-Server Model**:
-1. **Next.js Frontend (Client)**: Acts as a rich, single-page application (SPA) wrapper driven by React 19. It communicates asynchronously via standard HTTP client fetches targeting RESTful backend endpoints.
-2. **C# ASP.NET Core Web API (Server)**: Acts as a stateless, high-throughput backend service. It is protected by JWT Bearer token authentication schema, resolving client contexts from claims.
+Our platform uses a high-performance decoupled container layout designed to isolate frontend presentation logic from stateless, transaction-secure APIs, with a dedicated caching tier to reduce SQL loads.
 
 ```mermaid
 graph TD
-    Client[Next.js React Client] -- "JSON / HTTPS" --> API[ASP.NET Web API]
-    API -- "DI Context" --> Service[Services Layer]
-    Service -- "Entity Framework Core" --> DB[(SQL Server DB)]
-    Service -- "HTTP Signature REST" --> Cloudinary[Cloudinary Cloud Store]
+    User([User / Admin])
+
+    subgraph SPA_Boundary ["Sharing Picture Platform Boundary"]
+        NextJS["NextJS Frontend Server<br>(Node.js App Router)"]
+        SPA["Browser SPA Client<br>(React 19 / Next.js SPA)"]
+        API["ASP.NET Core Web API<br>(.NET 8 / Kestrel)"]
+        Database[("SQL Server Database<br>(SharingPictureDb)")]
+        Redis[("Redis Distributed Cache<br>(User Sessions & Status)")]
+    end
+
+    subgraph External_Boundary ["External Services"]
+        Cloudinary["Cloudinary CDN & API<br>(Image Assets Store)"]
+        GoogleAuth["Google Identity Provider<br>(OAuth2 Services)"]
+    end
+
+    User -->|1. Requests Pages| NextJS
+    NextJS -->|2. Serves SPA & Assets| SPA
+    SPA -->|3. JSON Queries & Mutations (JWT Bearer)| API
+    SPA -->|4. Direct Binary Upload| Cloudinary
+    API -->|5. Reads / Writes Tables| Database
+    API -->|6. Caches User Status (10m TTL)| Redis
+    API -->|7. Validates OAuth Token| GoogleAuth
+    API -->|8. Async Purge Asset| Cloudinary
 ```
+
+### Architectural Boundaries & Structural Boundaries
+
+*   **Decoupled Next.js Framework Treatment**: The frontend Next.js server serves initial static assets, prerendered layout envelopes, and React runtime code to the browser client. Once loaded, the Browser SPA Client takes over navigation and handles dynamic states, making async JSON API requests directly to the backend over HTTPS.
+*   **Network Ingress Protection**: Public-facing requests are intercepted by a Reverse Proxy and Web Application Firewall (WAF) Ingress Gateway layer. This gateway terminates SSL, protects against common network vulnerabilities, and delegates traffic to local API controllers running within the high-throughput .NET Kestrel runner.
+*   **In-Process Monolith DI Separations**: Inside the ASP.NET Core process, the codebase enforces strict separation of concerns. Controllers receive API payloads and delegate them to business services via Dependency Injection (DI) scopes. Services utilize Entity Framework Core DbContext configurations to query the underlying database.
+*   **Anti-Thread Starvation Media Pipeline**: To keep backend CPU and memory footprints minimal, binary media uploads never traverse the .NET Web API process. The client browser uploads binary images directly to Cloudinary via HTTPS using secure SHA-256 API signatures generated in-process by the backend `MediaService`.
+*   **Redis Distributed Caching Tier**: A Redis caching store acts as an intermediate state provider. For high-frequency middleware operations (e.g. validating user status on every request), user status is cached for 10 minutes, completely bypassing SQL Server on cache hits. On data modification (banning a user), the cache is explicitly evicted to maintain immediate authorization sync.
 
 ### Core Design Patterns Implemented
 
@@ -64,7 +89,7 @@ Composite join table linking users to roles (Many-to-Many).
 Represents picture uploads metadata.
 - `id` (int, PK, Identity): Primary key.
 - `user_id` (int, FK pointing to `users(id)`): Creator reference.
-- `caption` (varchar(1000), nullable): Post text content.
+- `caption` (nvarchar(1000), nullable): Post text content.
 - `image_url` (varchar(255)): Cloudinary hosting URL.
 - `cloudinary_public_id` (varchar(100)): Cloudinary asset ID.
 - `delivery_status` (varchar(20), default `'pending'`): Visibility status (`pending`, `hidden`). Active visible statuses on the feed are evaluated via `.Where(p => p.DeliveryStatus != "hidden")`, which means statuses like `'pending'` or `'complete'` are valid public display states.
@@ -74,7 +99,7 @@ Represents picture uploads metadata.
 #### Table: `tags`
 Categorization taxonomy.
 - `id` (int, PK, Identity): Primary key.
-- `tag_name` (varchar(50)): Unique normalized lowercase tag term.
+- `tag_name` (nvarchar(50)): Unique normalized lowercase tag term.
 
 #### Table: `post_tags`
 Join table linking posts to tags (Many-to-Many).
@@ -92,7 +117,7 @@ Comments stream linked to posts.
 - `id` (int, PK, Identity): Primary key.
 - `user_id` (int, FK pointing to `users(id)`): Commenter reference.
 - `post_id` (int, FK pointing to `posts(id)`): Target post reference.
-- `content` (varchar(1000)): Plaintext message.
+- `content` (nvarchar(1000)): Plaintext message.
 - `created_at` (datetime, default `GETDATE()`): Timestamp.
 
 #### Table: `follows`
@@ -106,7 +131,7 @@ User moderation complaints queue.
 - `id` (int, PK, Identity): Primary key.
 - `reporter_id` (int, FK pointing to `users(id)`): Reporting user reference.
 - `post_id` (int, FK pointing to `posts(id)`): Reported post.
-- `reason` (varchar(500)): Complaint comment.
+- `reason` (nvarchar(1000)): Complaint comment.
 - `status` (varchar(20), default `'pending'`): Report status (`pending`, `resolved`, `dismissed`).
 - `moderator_id` (int, FK pointing to `users(id)`, nullable): Moderator processing resolution.
 - `created_at` (datetime, default `GETDATE()`): Timestamp.
@@ -126,10 +151,9 @@ Central log history for administrative actions.
 
 To protect data consistency and comply with SQL Server constraints, the platform handles CASCADE operations programmatically:
 1. **Direct Constraints**: Relational foreign keys are mapped using database integrity rules.
-2. **Programmatic Cascadings**: Direct SQL CASCADE deletes on complex entities (like User or Post) can cause circular dependency constraints in SQL Server. Thus, controllers and services execute programmatic cascades. For example, during `DELETE_POST` resolving:
-   - Associated Comments are deleted first.
-   - Associated Likes are deleted.
-   - Associated Reports are cleared.
-   - **Cloudinary Deletion**: The system must explicitly invoke the Cloudinary API via `MediaService` (using `cloudinary_public_id`) to destroy the cloud asset before removing the SQL database row to prevent cloud storage leaks.
-   - The central Post row is then safely removed, preventing orphan rows.
+2. **Programmatic Cascades & Eventual Consistency**: Direct SQL CASCADE deletes on complex entities (like User or Post) can cause circular dependency constraints in SQL Server. Thus, controllers and services execute programmatic cascades. For example, during `DELETE_POST` resolution in `AdminService`:
+   - A database transaction block is opened: `await _context.Database.BeginTransactionAsync()`.
+   - Programmatic database removals are performed sequentially (Comments -> Likes -> Reports -> Post) and logged to the central audit log.
+   - The database changes are saved and the transaction is committed: `await _context.SaveChangesAsync()` followed by `await transaction.CommitAsync()`.
+   - **Async Cloudinary Purge**: Only after the SQL transaction successfully commits, the system dispatches the Cloudinary asset destruction call asynchronously via `MediaService.DeleteImageAsync(cloudinary_public_id)` inside a background thread (`Task.Run`). This eventual consistency pattern ensures that database transaction rollbacks never trigger premature external asset deletions, avoiding distributed data inconsistencies.
 3. **Validation Guards**: Entity uniqueness is validated (e.g. unique username checks in [ProfileService.cs](file:///d:/Dev_Web/Picterest/backend/SharingPicture/SharingPicture.Services/ProfileService.cs) and unique report checks in [ReportService.cs](file:///d:/Dev_Web/Picterest/backend/SharingPicture/SharingPicture.Services/ReportService.cs)) prior to database save operations.

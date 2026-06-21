@@ -2,6 +2,9 @@ using Microsoft.Extensions.Options;
 using System;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
 
 namespace SharingPicture.Services;
 
@@ -39,5 +42,15 @@ public class MediaService : IMediaService
             Folder = folder,
             CloudName = _settings.CloudName
         };
+    }
+
+    public async Task<bool> DeleteImageAsync(string publicId)
+    {
+        if (string.IsNullOrWhiteSpace(publicId)) return false;
+        var account = new Account(_settings.CloudName, _settings.ApiKey, _settings.ApiSecret);
+        var cloudinary = new Cloudinary(account);
+        var deletionParams = new DeletionParams(publicId);
+        var result = await cloudinary.DestroyAsync(deletionParams);
+        return result.Result == "ok";
     }
 }

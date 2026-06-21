@@ -77,7 +77,9 @@ public partial class SharingPictureDbContext : DbContext
             entity.ToTable("comments");
 
             entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.Content).HasColumnName("content");
+            entity.Property(e => e.Content)
+                .HasColumnType("nvarchar(1000)")
+                .HasColumnName("content");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnName("created_at");
@@ -146,7 +148,9 @@ public partial class SharingPictureDbContext : DbContext
             entity.ToTable("posts");
 
             entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.Caption).HasColumnName("caption");
+            entity.Property(e => e.Caption)
+                .HasColumnType("nvarchar(1000)")
+                .HasColumnName("caption");
             entity.Property(e => e.CloudinaryPublicId)
                 .HasMaxLength(100)
                 .IsUnicode(false)
@@ -202,7 +206,9 @@ public partial class SharingPictureDbContext : DbContext
                 .HasColumnName("created_at");
             entity.Property(e => e.ModeratorId).HasColumnName("moderator_id");
             entity.Property(e => e.PostId).HasColumnName("post_id");
-            entity.Property(e => e.Reason).HasColumnName("reason");
+            entity.Property(e => e.Reason)
+                .HasColumnType("nvarchar(1000)")
+                .HasColumnName("reason");
             entity.Property(e => e.ReporterId).HasColumnName("reporter_id");
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
@@ -249,7 +255,7 @@ public partial class SharingPictureDbContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.TagName)
-                .HasMaxLength(50)
+                .HasColumnType("nvarchar(50)")
                 .HasColumnName("tag_name");
         });
 

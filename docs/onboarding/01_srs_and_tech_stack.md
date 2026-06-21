@@ -14,7 +14,7 @@ The **Sharing Picture Platform** is a secure, high-performance, Pinterest-inspir
 - **Module 3: Masonry Discovery Feed**: Responsive grid system featuring programmatic layout distribution to eliminate Cumulative Layout Shift (CLS), unified search queries filtering by captions/tags, and infinite scrolling feeds.
 - **Module 4: Social Interaction & Engagement**: Optimistic like toggling for instantaneous client responses and chronological comments feeds utilizing cache invalidation hooks.
 - **Module 5: Relationship Management & Profiles**: User profile cards displaying detailed metadata statistics, dynamic Follower/Following modal list overlays, and real-time navigation sync.
-- **Module 6: Moderation & Audit Logging**: Banning infractions, CASCADE deletes for deleted posts, user reports shadow-ban automation (auto-hiding posts with $\ge 5$ reports), and central database audit logs.
+- **Module 6: Moderation & Audit Logging**: Banning infractions, Programmatic cascade deletions for deleted posts, user reports shadow-ban automation (auto-hiding posts with $\ge 5$ reports), and central database audit logs.
 
 ---
 

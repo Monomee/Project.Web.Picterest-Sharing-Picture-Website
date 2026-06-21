@@ -1,10 +1,12 @@
 using System;
+using System.Threading.Tasks;
 
 namespace SharingPicture.Services;
 
 public interface IMediaService
 {
     SignatureResponseDto GenerateUploadSignature(string folder = "sharing_media");
+    Task<bool> DeleteImageAsync(string publicId);
 }
 
 public class SignatureResponseDto

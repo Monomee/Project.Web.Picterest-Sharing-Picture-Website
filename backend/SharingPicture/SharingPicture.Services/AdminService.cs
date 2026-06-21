@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using SharingPicture.Data.Context;
 using SharingPicture.Data.Entities;
 using System;
@@ -12,11 +13,19 @@ public class AdminService : IAdminService
 {
     private readonly SharingPictureDbContext _context;
     private readonly IAuditLogService _auditLogService;
+    private readonly IMediaService _mediaService;
+    private readonly IDistributedCache _cache;
 
-    public AdminService(SharingPictureDbContext context, IAuditLogService auditLogService)
+    public AdminService(
+        SharingPictureDbContext context, 
+        IAuditLogService auditLogService,
+        IMediaService mediaService,
+        IDistributedCache cache)
     {
         _context = context;
         _auditLogService = auditLogService;
+        _mediaService = mediaService;
+        _cache = cache;
     }
 
     public async Task<List<ReportDto>> GetPendingReportsAsync(int page, int pageSize)
@@ -61,36 +70,69 @@ public class AdminService : IAdminService
         report.Status = action == "DISMISS" ? "dismissed" : "resolved";
         report.ModeratorId = actorId;
 
+        int? banUserId = null;
+
         if (action == "DELETE_POST")
         {
             if (report.Post != null)
             {
                 int postId = report.PostId;
                 string caption = report.Post.Caption ?? "";
+                string? cloudinaryPublicId = report.Post.CloudinaryPublicId;
 
-                // Programmatic Cascade Deletes to avoid SQL foreign key constraints
-                // 1. Remove comments
-                var comments = _context.Comments.Where(c => c.PostId == postId);
-                _context.Comments.RemoveRange(comments);
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    // Programmatic Cascade Deletes to avoid SQL foreign key constraints
+                    // 1. Remove comments
+                    var comments = _context.Comments.Where(c => c.PostId == postId);
+                    _context.Comments.RemoveRange(comments);
 
-                // 2. Remove likes
-                var likes = _context.Likes.Where(l => l.PostId == postId);
-                _context.Likes.RemoveRange(likes);
+                    // 2. Remove likes
+                    var likes = _context.Likes.Where(l => l.PostId == postId);
+                    _context.Likes.RemoveRange(likes);
 
-                // 3. Remove all other reports associated with this post (including current report)
-                var relatedReports = _context.Reports.Where(r => r.PostId == postId);
-                _context.Reports.RemoveRange(relatedReports);
+                    // 3. Remove all other reports associated with this post (including current report)
+                    var relatedReports = _context.Reports.Where(r => r.PostId == postId);
+                    _context.Reports.RemoveRange(relatedReports);
 
-                // 4. Remove post
-                _context.Posts.Remove(report.Post);
+                    // 4. Remove post
+                    _context.Posts.Remove(report.Post);
 
-                // Central Audit Log
-                await _auditLogService.LogActionAsync(
-                    "DELETE_POST",
-                    actorId,
-                    postId,
-                    $"Deleted post: {caption}. Original reported reason: {report.Reason}. Remarks: {dto.Remarks}"
-                );
+                    // Central Audit Log
+                    await _auditLogService.LogActionAsync(
+                        "DELETE_POST",
+                        actorId,
+                        postId,
+                        $"Deleted post: {caption}. Original reported reason: {report.Reason}. Remarks: {dto.Remarks}"
+                    );
+
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    // Eventual consistency: Async Cloudinary asset destruction AFTER SQL commit
+                    if (!string.IsNullOrWhiteSpace(cloudinaryPublicId))
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await _mediaService.DeleteImageAsync(cloudinaryPublicId);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Async image purge failed for {cloudinaryPublicId}: {ex.Message}");
+                            }
+                        });
+                    }
+
+                    return true;
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
             }
         }
         else if (action == "BAN_USER")
@@ -101,6 +143,7 @@ public class AdminService : IAdminService
                 if (targetUser != null)
                 {
                     targetUser.Status = "banned";
+                    banUserId = targetUser.Id;
 
                     // Central Audit Log
                     await _auditLogService.LogActionAsync(
@@ -129,6 +172,12 @@ public class AdminService : IAdminService
         }
 
         await _context.SaveChangesAsync();
+
+        if (banUserId.HasValue)
+        {
+            await _cache.RemoveAsync($"user-status:{banUserId.Value}");
+        }
+
         return true;
     }
 
