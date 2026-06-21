@@ -27,10 +27,10 @@ graph TD
 
     User -->|1. Requests Pages| NextJS
     NextJS -->|2. Serves SPA & Assets| SPA
-    SPA -->|3. JSON Queries & Mutations (JWT Bearer)| API
+    SPA -->|"3. JSON Queries & Mutations (JWT Bearer)"| API
     SPA -->|4. Direct Binary Upload| Cloudinary
     API -->|5. Reads / Writes Tables| Database
-    API -->|6. Caches User Status (10m TTL)| Redis
+    API -->|"6. Caches User Status - 10m TTL"| Redis
     API -->|7. Validates OAuth Token| GoogleAuth
     API -->|8. Async Purge Asset| Cloudinary
 ```
