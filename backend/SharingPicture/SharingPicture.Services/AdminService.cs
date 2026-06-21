@@ -131,4 +131,24 @@ public class AdminService : IAdminService
         await _context.SaveChangesAsync();
         return true;
     }
+
+    public async Task<List<AuditLogDto>> GetAuditLogsAsync(int page, int pageSize)
+    {
+        return await _context.AuditLogs
+            .Include(a => a.Actor)
+            .OrderByDescending(a => a.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(a => new AuditLogDto
+            {
+                Id = a.Id,
+                ActorId = a.ActorId,
+                ActorUsername = a.Actor != null ? a.Actor.Username : "Unknown",
+                ActionType = a.ActionType,
+                TargetId = a.TargetId,
+                Details = a.Details,
+                CreatedAt = a.CreatedAt
+            })
+            .ToListAsync();
+    }
 }
