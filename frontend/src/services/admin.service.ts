@@ -66,3 +66,37 @@ export async function resolveReport(reportId: number, payload: ResolveReportPayl
 
   return response.json();
 }
+
+export interface AuditLogItem {
+  id: number;
+  actorId: number;
+  actorUsername: string;
+  actionType: string;
+  targetId: number | null;
+  details: string | null;
+  createdAt: string;
+}
+
+export async function getAuditLogs(page: number = 1, pageSize: number = 10): Promise<AuditLogItem[]> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (!token) {
+    throw new Error('Authentication required.');
+  }
+
+  const response = await fetch(`${API_URL}/admin/logs?page=${page}&pageSize=${pageSize}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Access denied. Admin role required.');
+    }
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to retrieve audit logs.');
+  }
+
+  return response.json();
+}

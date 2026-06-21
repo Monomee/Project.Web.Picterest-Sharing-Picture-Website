@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { reportPost } from '@/services/post.service';
 
@@ -22,6 +23,11 @@ export default function ReportPostModal({ isOpen, onClose, postId }: ReportPostM
   const queryClient = useQueryClient();
   const [selectedReason, setSelectedReason] = useState(COMMON_REASONS[0]);
   const [customReason, setCustomReason] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Toast notification state: null | { type: 'success' | 'error'; message: string }
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -73,7 +79,7 @@ export default function ReportPostModal({ isOpen, onClose, postId }: ReportPostM
     }
   });
 
-  if (!isOpen) return null;
+  if (!mounted || !isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,8 +100,8 @@ export default function ReportPostModal({ isOpen, onClose, postId }: ReportPostM
 
   const isCustomSelected = selectedReason.includes('Other');
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fadeIn">
       {/* Background click to dismiss */}
       <div className="absolute inset-0 cursor-default" onClick={onClose} />
 
@@ -204,6 +210,7 @@ export default function ReportPostModal({ isOpen, onClose, postId }: ReportPostM
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

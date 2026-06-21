@@ -132,8 +132,8 @@ Review the current status of each component:
 | **Interaction System** | Like/Comment services | Optimistic Cache Sync | **Done** |
 | **Relationship overlays** | Follows counts endpoints | Overlay Modal Lists | **Done** |
 | **Report shadow-ban** | Threshold auto-hiding | Form inputs & alert | **Done** |
-| **Admin Moderation Portal** | Cascade deletions API | Layout role guards | **Done** |
-| **Audit Logging** | Central structured tables | N/A | **Done** |
+| **Admin Moderation Portal** | Cascade deletions API | Layout role guards & Admin Logs UI Dashboard | **Done** |
+| **Audit Logging** | Central structured tables & GET Logs API | Dynamic Paginated Logs View & self-dismissing toast validations | **Done** |
 | **Direct Binary Downloads** | N/A | CORS Blob fallback | **Done** |
 | **Privacy Toggle Controls** | Strict feed filtering | Form toggle selectors | **Done** |
 | **Live Notifications** | Future Scope | Future Scope | **Active** |

@@ -318,7 +318,7 @@ Navigating to a profile page queries `GetProfileByIdAsync` to return counts and 
 ## Use Case F: User Reporting Shadow-Ban Automation & Admin Moderation Panel with Audit Logging
 
 ### 1. Narrative Description
-Users can report content that violates community guidelines. If a post receives 5 or more unique user reports, it is automatically shadow-banned (its `DeliveryStatus` is set to `"hidden"`, removing it from the public feed). Admins review reported posts and can either delete them (using programmatic cascade deletes), ban users, or dismiss reports (restoring the post's status back to `"pending"`). All admin resolutions are logged to the database.
+Users can report content that violates community guidelines. If a post receives 5 or more unique user reports, it is automatically shadow-banned (its `DeliveryStatus` is set to `"hidden"`, removing it from the public feed). To prevent self-reporting loop abuse, a strict self-reporting constraint is enforced: a user is prohibited from reporting their own post. This rule is validated on the backend and the report trigger is hidden from the UI when a post belongs to the authenticated user. Admins review reported posts and can either delete them (using programmatic cascade deletes), ban users, or dismiss reports (restoring the post's status back to `"pending"`). All admin resolutions are logged to the database. Administrators can access the Admin Audit Logs UI Dashboard to monitor administrative actions, actor profiles, target IDs, and remarks.
 
 ### 2. Mermaid Sequence Diagram
 ```mermaid
@@ -347,7 +347,11 @@ sequenceDiagram
         PostService->>ReportsCtrl: POST /api/reports [Bearer Token]
         ReportsCtrl->>ReportsSvc: ReportPostAsync(reporterId, postId, reason)
         ReportsSvc->>Database: Query duplicate reports checks
-        alt User already reported post
+        alt Self-Reporting Violation (post creator matches reporter)
+            ReportsSvc-->>ReportsCtrl: Throw InvalidOperationException ("You cannot report your own post.")
+            ReportsCtrl-->>ReportModal: Return HTTP 400 Bad Request
+            ReportModal-->>User: Show warning Toast ("You cannot report your own post.")
+        else User already reported post
             Database-->>ReportsSvc: Duplicate found
             ReportsSvc-->>ReportsCtrl: Throw InvalidOperationException
             ReportsCtrl-->>ReportModal: Return HTTP 400 Bad Request
@@ -397,25 +401,40 @@ sequenceDiagram
         AdminSvc-->>AdminCtrl: Return resolution confirmation
         AdminCtrl-->>AdminPage: Return HTTP 200 Success
         AdminPage-->>Admin: Update queue listing, show resolution alerts
+    else Admin Logs View Loop
+        Admin->>AdminPage: Navigate to /admin/logs
+        AdminPage->>AdminService: getAuditLogs()
+        AdminService->>AdminCtrl: GET /api/admin/logs [Admin Guard JWT]
+        AdminCtrl->>AdminSvc: GetAuditLogsAsync()
+        AdminSvc->>Database: Fetch audit logs eager loading Actor profiles (Username)
+        Database-->>AdminSvc: Return audit logs list
+        AdminSvc-->>AdminCtrl: Return AuditLogDto list
+        AdminCtrl-->>AdminPage: Return HTTP 200 payload
+        AdminPage-->>Admin: Render paginated glassmorphic logs data table
     end
 ```
 
 ### 3. Explicit Code File Mapping Table
 | Layer/Side | File Path | Technical Role & Responsibility in the Flow |
 | :--- | :--- | :--- |
-| Frontend | [ReportPostModal.tsx](file:///d:/Dev_Web/Picterest/frontend/src/components/pinterest/ReportPostModal.tsx) | Renders report forms, handles select dropdowns, custom textarea, and toast alerts. |
-| Frontend | [page.tsx](file:///d:/Dev_Web/Picterest/frontend/src/app/admin/reports/page.tsx) | Admin dashboard. Lists reports and allows admins to resolve them. |
-| Frontend | [admin.service.ts](file:///d:/Dev_Web/Picterest/frontend/src/services/admin.service.ts) | Exposes client-side routes to get reports queue list and dispatch resolutions. |
+| Frontend | [ReportPostModal.tsx](file:///d:/Dev_Web/Picterest/frontend/src/components/pinterest/ReportPostModal.tsx) | Renders report forms inside React Portal (`createPortal`), handles select dropdowns, custom textarea, and toast alerts. |
+| Frontend | [page.tsx](file:///d:/Dev_Web/Picterest/frontend/src/app/admin/reports/page.tsx) | Admin reports dashboard. Lists reports and allows admins to resolve them. |
+| Frontend | [page.tsx](file:///d:/Dev_Web/Picterest/frontend/src/app/admin/logs/page.tsx) | Admin audit logs dashboard. Renders paginated table of administrative audit logs history. |
+| Frontend | [admin.service.ts](file:///d:/Dev_Web/Picterest/frontend/src/services/admin.service.ts) | Exposes client-side routes to get reports queue list, dispatch resolutions, and fetch audit logs. |
 | Backend API | [ReportsController.cs](file:///d:/Dev_Web/Picterest/backend/SharingPicture/SharingPicture.WebApi/Controllers/ReportsController.cs) | Exposes the protected `POST /api/reports` endpoint. |
-| Backend API | [AdminController.cs](file:///d:/Dev_Web/Picterest/backend/SharingPicture/SharingPicture.WebApi/Controllers/AdminController.cs) | Exposes protected admin reports queries and report resolution endpoints. |
-| Backend Services | [ReportService.cs](file:///d:/Dev_Web/Picterest/backend/SharingPicture/SharingPicture.Services/ReportService.cs) | Validates duplicate report submissions and handles shadow-ban automated hiding. |
-| Backend Services | [AdminService.cs](file:///d:/Dev_Web/Picterest/backend/SharingPicture/SharingPicture.Services/AdminService.cs) | Executes administrative resolutions, cascades deletions, and updates user/post states. |
+| Backend API | [AdminController.cs](file:///d:/Dev_Web/Picterest/backend/SharingPicture/SharingPicture.WebApi/Controllers/AdminController.cs) | Exposes protected admin reports queries, report resolutions, and the audit logs list endpoints. |
+| Backend Services | [ReportService.cs](file:///d:/Dev_Web/Picterest/backend/SharingPicture/SharingPicture.Services/ReportService.cs) | Validates reporter details to reject self-reporting and duplicate submissions, and handles shadow-ban automated hiding. |
+| Backend Services | [AdminService.cs](file:///d:/Dev_Web/Picterest/backend/SharingPicture/SharingPicture.Services/AdminService.cs) | Executes administrative resolutions, cascades deletions, updates user/post states, and queries paginated audit logs. |
 | Backend Services | [AuditLogService.cs](file:///d:/Dev_Web/Picterest/backend/SharingPicture/SharingPicture.Services/AuditLogService.cs) | Logs administrative actions to the central `audit_logs` database table. |
 
 ### 4. End-to-End Data Flow Explanation
-When a report is submitted, the request goes to `ReportPostAsync`. The service checks the `reports` table to verify the user has not reported this post yet. If a duplicate is found, an exception is thrown, returning an HTTP 400 Bad Request to the client, which displays a warning toast. If validation passes, a new report row is added. The service then queries the unique report count for the post. If the count reaches 5 or more, the post's `DeliveryStatus` is set to `"hidden"`. When an admin reviews the reports queue and selects a resolution:
+When a report is submitted, the request goes to `ReportPostAsync`. The service checks the `reports` table to verify the user has not reported this post yet, and rejects self-reports (where post owner matches reporter). If a duplicate or self-report is found, an exception is thrown, returning an HTTP 400 Bad Request to the client, which displays a warning toast. If validation passes, a new report row is added. The service then queries the unique report count for the post. If the count reaches 5 or more, the post's `DeliveryStatus` is set to `"hidden"`. When an admin reviews the reports queue and selects a resolution:
 - **`DELETE_POST`**: The system cascades database deletion down to the post's comments, likes, and reports. **IMPORTANT**: To prevent storage leaks in our cloud hosting, the system must explicitly invoke the Cloudinary API via `MediaService` (using `cloudinary_public_id`) to destroy the hosted cloud asset *before* the SQL database removes the actual post record.
 - **`BAN_USER`**: Sets the user's status to `"banned"`, which is checked by middleware.
 - **`DISMISS`**: Sets `DeliveryStatus` back to `"pending"`, restoring the post's visibility.
 All moderator actions are logged to the `audit_logs` database table.
+
+> [!NOTE]
+> **React Portal Viewport Breakthrough**:
+> The `ReportPostModal.tsx` component is wrapped with React's `createPortal` targeting `document.body`. This forces the modal layout to render outside the DOM hierarchy of parent elements (like `PinCard` or other grid blocks). It prevents CSS constraints like parent transforms (used for feed hover translations) or container `overflow: hidden` rules from clipping, scaling, or trapping the glassmorphic overlay, guaranteeing absolute z-index viewport positioning.
 

@@ -52,4 +52,16 @@ public class AdminController : ControllerBase
 
         return Ok(new { message = "Report resolved successfully." });
     }
+
+    [HttpGet("logs")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> GetAuditLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 10;
+        if (pageSize > 100) pageSize = 100; // safety ceiling
+
+        var logs = await _adminService.GetAuditLogsAsync(page, pageSize);
+        return Ok(logs);
+    }
 }

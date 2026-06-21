@@ -20,10 +20,16 @@ public class ReportService : IReportService
     public async Task<Report> ReportPostAsync(int reporterId, int postId, string reason)
     {
         // 1. Validate post exists
-        var postExists = await _context.Posts.AnyAsync(p => p.Id == postId);
-        if (!postExists)
+        var post = await _context.Posts.FirstOrDefaultAsync(p => p.Id == postId);
+        if (post == null)
         {
             throw new KeyNotFoundException("Post not found.");
+        }
+
+        // Validate user is not reporting their own post
+        if (post.UserId == reporterId)
+        {
+            throw new InvalidOperationException("You cannot report your own post.");
         }
 
         // 2. Validate user has not already reported this post
@@ -56,12 +62,8 @@ public class ReportService : IReportService
 
         if (uniqueReportCount >= 5)
         {
-            var post = await _context.Posts.FindAsync(postId);
-            if (post != null)
-            {
-                post.DeliveryStatus = "hidden";
-                await _context.SaveChangesAsync();
-            }
+            post.DeliveryStatus = "hidden";
+            await _context.SaveChangesAsync();
         }
 
         return report;
