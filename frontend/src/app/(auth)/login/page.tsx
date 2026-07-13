@@ -8,6 +8,13 @@ import { useAuth } from '@/hooks/useAuth';
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your-google-client-id';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7287/api';
 
+async function sha256(message: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
@@ -71,10 +78,18 @@ export default function LoginPage() {
     if (!validate()) return;
 
     setIsLoading(true);
+
+    let securePassword = password;
+    try {
+      securePassword = await sha256(password);
+    } catch (hashError) {
+      console.error('Client-side hashing failed, falling back:', hashError);
+    }
+
     const endpoint = mode === 'login' ? `${API_URL}/auth/login` : `${API_URL}/auth/register`;
     const payload = mode === 'login'
-      ? { usernameOrEmail, password }
-      : { username, email, password };
+      ? { usernameOrEmail, password: securePassword }
+      : { username, email, password: securePassword };
 
     try {
       const response = await fetch(endpoint, {

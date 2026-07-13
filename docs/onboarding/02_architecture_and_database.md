@@ -10,29 +10,38 @@ Our platform uses a high-performance decoupled container layout designed to isol
 
 ```mermaid
 graph TD
-    User([User / Admin])
-
-    subgraph SPA_Boundary ["Sharing Picture Platform Boundary"]
-        NextJS["NextJS Frontend Server<br>(Node.js App Router)"]
-        SPA["Browser SPA Client<br>(React 19 / Next.js SPA)"]
-        API["ASP.NET Core Web API<br>(.NET 8 / Kestrel)"]
-        Database[("SQL Server Database<br>(SharingPictureDb)")]
-        Redis[("Redis Distributed Cache<br>(User Sessions & Status)")]
+    %% Layer 1: Client Layer
+    subgraph Layer1 ["1. Client Layer"]
+        UI["Next.js Web SPA<br>(React 19 Components)"]
     end
 
-    subgraph External_Boundary ["External Services"]
-        Cloudinary["Cloudinary CDN & API<br>(Image Assets Store)"]
-        GoogleAuth["Google Identity Provider<br>(OAuth2 Services)"]
+    %% Layer 2: Presentation Layer
+    subgraph Layer2 ["2. Presentation Layer"]
+        Middleware["Auth & Validation Gateway<br>(JWT & Model Filter)"]
+        Controllers["Thin API Controllers<br>(Auth, Posts, Admin)"]
     end
 
-    User -->|1. Requests Pages| NextJS
-    NextJS -->|2. Serves SPA & Assets| SPA
-    SPA -->|"3. JSON Queries & Mutations (JWT Bearer)"| API
-    SPA -->|4. Direct Binary Upload| Cloudinary
-    API -->|5. Reads / Writes Tables| Database
-    API -->|"6. Caches User Status - 10m TTL"| Redis
-    API -->|7. Validates OAuth Token| GoogleAuth
-    API -->|8. Async Purge Asset| Cloudinary
+    %% Layer 3: Application Layer
+    subgraph Layer3 ["3. Application Layer"]
+        Services["Application Services<br>(Business Logic & Policies)"]
+    end
+
+    %% Layer 4: Data Access Layer
+    subgraph Layer4 ["4. Data Access Layer"]
+        DbContext["EF Core DbContext<br>(SharingPictureDbContext)"]
+    end
+
+    %% Layer 5: Physical Data Tier
+    subgraph Layer5 ["5. Physical Data Tier"]
+        DB[("SQL Server Engine<br>(SharingPictureDb)")]
+    end
+
+    %% Workflows
+    UI -->|"1. HTTPS Requests (JWT Bearer)"| Middleware
+    Middleware -->|"2. Route Request"| Controllers
+    Controllers -->|"3. Business Operations"| Services
+    Services -->|"4. Data Operations"| DbContext
+    DbContext -->|"5. Query / Update"| DB
 ```
 
 ### Architectural Boundaries & Structural Boundaries
