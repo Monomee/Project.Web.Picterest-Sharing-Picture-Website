@@ -228,4 +228,40 @@ public class AuthService : IAuthService
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);
     }
+
+    public async Task<string?> GenerateResetTokenAsync(string email)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        if (user == null)
+        {
+            return null;
+        }
+
+        var token = Guid.NewGuid().ToString();
+        user.PasswordResetToken = token;
+        user.PasswordResetTokenExpires = DateTime.UtcNow.AddMinutes(15);
+
+        await _context.SaveChangesAsync();
+        return token;
+    }
+
+    public async Task<bool> ResetPasswordAsync(string email, string token, string newPasswordHash)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        if (user == null || user.PasswordResetToken != token || user.PasswordResetTokenExpires < DateTime.UtcNow)
+        {
+            return false;
+        }
+
+        // Hash the incoming SHA-256 string from client using BCrypt
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(newPasswordHash);
+        user.PasswordHash = passwordHash;
+
+        // Clear the token and expiration
+        user.PasswordResetToken = null;
+        user.PasswordResetTokenExpires = null;
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
 }

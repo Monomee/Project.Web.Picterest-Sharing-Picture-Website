@@ -8,12 +8,19 @@ import { useAuth } from '@/hooks/useAuth';
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'your-google-client-id';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7287/api';
 
+async function sha256(message: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  // Mode: 'login' | 'register'
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  // Mode: 'login' | 'register' | 'forgot'
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
 
   // Input fields
   const [username, setUsername] = useState('');
@@ -39,7 +46,7 @@ export default function LoginPage() {
       if (!password) {
         newErrors.password = 'Password is required.';
       }
-    } else {
+    } else if (mode === 'register') {
       if (!username.trim()) {
         newErrors.username = 'Username is required.';
       } else if (username.length < 3) {
@@ -57,6 +64,12 @@ export default function LoginPage() {
       } else if (password.length < 6) {
         newErrors.password = 'Password must be at least 6 characters.';
       }
+    } else if (mode === 'forgot') {
+      if (!email.trim()) {
+        newErrors.email = 'Email is required.';
+      } else if (!/\S+@\S+\.\S+/.test(email)) {
+        newErrors.email = 'Invalid email address.';
+      }
     }
 
     setErrors(newErrors);
@@ -71,10 +84,42 @@ export default function LoginPage() {
     if (!validate()) return;
 
     setIsLoading(true);
+
+    if (mode === 'forgot') {
+      try {
+        const response = await fetch(`${API_URL}/auth/forgot-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to send reset email.');
+        }
+
+        setSuccessMessage(data.message || 'Password reset email sent successfully!');
+      } catch (err: any) {
+        setErrorMessage(err.message || 'Something went wrong. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    let securePassword = password;
+    try {
+      securePassword = await sha256(password);
+    } catch (hashError) {
+      console.error('Client-side hashing failed, falling back:', hashError);
+    }
+
     const endpoint = mode === 'login' ? `${API_URL}/auth/login` : `${API_URL}/auth/register`;
     const payload = mode === 'login'
-      ? { usernameOrEmail, password }
-      : { username, email, password };
+      ? { usernameOrEmail, password: securePassword }
+      : { username, email, password: securePassword };
 
     try {
       const response = await fetch(endpoint, {
@@ -181,43 +226,65 @@ export default function LoginPage() {
             Picterest
           </h2>
           <p className="mt-2 text-sm text-gray-400">
-            {mode === 'login' ? 'Welcome back! Please sign in' : 'Create an account to get started'}
+            {mode === 'login'
+              ? 'Welcome back! Please sign in'
+              : mode === 'register'
+                ? 'Create an account to get started'
+                : 'Enter your email to request a reset link'}
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="mb-6 flex rounded-lg bg-white/5 p-1 border border-white/5">
+        {/* Tab Switcher / Back Link */}
+        {mode !== 'forgot' ? (
+          <div className="mb-6 flex rounded-lg bg-white/5 p-1 border border-white/5">
+            <button
+              onClick={() => {
+                setMode('login');
+                setErrorMessage(null);
+                setSuccessMessage(null);
+                setErrors({});
+              }}
+              className={`w-1/2 rounded-md py-2 text-sm font-semibold transition-all duration-300 ${
+                mode === 'login'
+                  ? 'bg-linear-to-r from-purple-500 to-pink-500 text-white shadow-md'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => {
+                setMode('register');
+                setErrorMessage(null);
+                setSuccessMessage(null);
+                setErrors({});
+              }}
+              className={`w-1/2 rounded-md py-2 text-sm font-semibold transition-all duration-300 ${
+                mode === 'register'
+                  ? 'bg-linear-to-r from-purple-500 to-pink-500 text-white shadow-md'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Register
+            </button>
+          </div>
+        ) : (
           <button
+            type="button"
             onClick={() => {
               setMode('login');
               setErrorMessage(null);
               setSuccessMessage(null);
               setErrors({});
             }}
-            className={`w-1/2 rounded-md py-2 text-sm font-semibold transition-all duration-300 ${
-              mode === 'login'
-                ? 'bg-linear-to-r from-purple-500 to-pink-500 text-white shadow-md'
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
+            className="mb-6 flex items-center gap-2 text-xs font-semibold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-wider"
           >
-            Sign In
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Sign In
           </button>
-          <button
-            onClick={() => {
-              setMode('register');
-              setErrorMessage(null);
-              setSuccessMessage(null);
-              setErrors({});
-            }}
-            className={`w-1/2 rounded-md py-2 text-sm font-semibold transition-all duration-300 ${
-              mode === 'register'
-                ? 'bg-linear-to-r from-purple-500 to-pink-500 text-white shadow-md'
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            Register
-          </button>
-        </div>
+        )}
 
         {/* Success & Error Alert Panels */}
         {errorMessage && (
@@ -265,7 +332,30 @@ export default function LoginPage() {
             </div>
           )}
 
-          {mode === 'register' ? (
+          {mode === 'forgot' ? (
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                Email Address
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </span>
+                <input
+                  type="email"
+                  placeholder="john@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={`w-full rounded-lg border bg-white/5 py-2.5 pl-10 pr-4 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50 ${
+                    errors.email ? 'border-red-500/50 focus:ring-red-500/30' : 'border-white/10 hover:border-white/20'
+                  }`}
+                />
+              </div>
+              {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email}</p>}
+            </div>
+          ) : mode === 'register' ? (
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
                 Email Address
@@ -313,28 +403,46 @@ export default function LoginPage() {
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
-              Password
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </span>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={`w-full rounded-lg border bg-white/5 py-2.5 pl-10 pr-4 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50 ${
-                  errors.password ? 'border-red-500/50 focus:ring-red-500/30' : 'border-white/10 hover:border-white/20'
-                }`}
-              />
+          {mode !== 'forgot' && (
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Password
+                </label>
+                {mode === 'login' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('forgot');
+                      setErrorMessage(null);
+                      setSuccessMessage(null);
+                      setErrors({});
+                    }}
+                    className="text-xs font-medium text-purple-400 hover:text-purple-300 transition-colors bg-transparent border-none cursor-pointer"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </span>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={`w-full rounded-lg border bg-white/5 py-2.5 pl-10 pr-4 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50 ${
+                    errors.password ? 'border-red-500/50 focus:ring-red-500/30' : 'border-white/10 hover:border-white/20'
+                  }`}
+                />
+              </div>
+              {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password}</p>}
             </div>
-            {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password}</p>}
-          </div>
+          )}
 
           <button
             type="submit"
@@ -348,11 +456,14 @@ export default function LoginPage() {
               </svg>
             ) : mode === 'login' ? (
               'Sign In'
-            ) : (
+            ) : mode === 'register' ? (
               'Create Account'
+            ) : (
+              'Send Reset Link'
             )}
           </button>
         </form>
+
 
         {/* Divider */}
         <div className="relative my-6">
