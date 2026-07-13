@@ -294,6 +294,11 @@ public partial class SharingPictureDbContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("username");
+            entity.Property(e => e.PasswordResetToken)
+                .HasMaxLength(100)
+                .HasColumnName("password_reset_token");
+            entity.Property(e => e.PasswordResetTokenExpires)
+                .HasColumnName("password_reset_token_expires");
         });
 
         modelBuilder.Entity<Warning>(entity =>

@@ -9,4 +9,6 @@ public interface IAuthService
     Task<User?> LoginAsync(string usernameOrEmail, string password);
     Task<User?> VerifyGoogleTokenAsync(string idToken);
     string GenerateJwtToken(User user);
+    Task<string?> GenerateResetTokenAsync(string email);
+    Task<bool> ResetPasswordAsync(string email, string token, string newPasswordHash);
 }

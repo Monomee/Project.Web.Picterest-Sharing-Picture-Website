@@ -57,6 +57,9 @@ builder.Services.AddAuthentication(options =>
 // Configure Cloudinary Options
 builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
 
+// Configure Email Settings
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+
 // Configure Distributed Cache (Redis)
 builder.Services.AddStackExchangeRedisCache(options =>
 {
@@ -65,6 +68,7 @@ builder.Services.AddStackExchangeRedisCache(options =>
 
 // Register Scoped Services
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IMediaService, MediaService>();
 builder.Services.AddScoped<IPostService, PostService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();

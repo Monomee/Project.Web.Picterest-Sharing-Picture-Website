@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SharingPicture.Data.Context;
 
@@ -11,9 +12,11 @@ using SharingPicture.Data.Context;
 namespace SharingPicture.Data.Migrations
 {
     [DbContext(typeof(SharingPictureDbContext))]
-    partial class SharingPictureDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260713044919_AddPasswordResetFields")]
+    partial class AddPasswordResetFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
