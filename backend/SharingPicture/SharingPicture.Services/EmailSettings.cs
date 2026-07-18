@@ -8,4 +8,5 @@ public class EmailSettings
     public string SenderEmail { get; set; } = null!;
     public string Username { get; set; } = null!;
     public string Password { get; set; } = null!;
+    public string FrontendBaseUrl { get; set; } = null!;
 }

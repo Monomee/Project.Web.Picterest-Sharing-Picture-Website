@@ -109,11 +109,14 @@ export default function LoginPage() {
       return;
     }
 
-    let securePassword = password;
+    let securePassword = '';
     try {
       securePassword = await sha256(password);
     } catch (hashError) {
-      console.error('Client-side hashing failed, falling back:', hashError);
+      console.error('Client-side hashing failed:', hashError);
+      setErrorMessage('Trình duyệt của bạn không hỗ trợ mã hóa bảo mật. Vui lòng cập nhật hoặc sử dụng trình duyệt khác.');
+      setIsLoading(false);
+      return;
     }
 
     const endpoint = mode === 'login' ? `${API_URL}/auth/login` : `${API_URL}/auth/register`;
